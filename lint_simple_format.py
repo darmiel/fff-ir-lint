@@ -12,7 +12,7 @@ def result_simple_output():
         print("Error in line", lnr)
         print(f"'{line}'")
 
-        mark = create_error_indicator_array(len(line), result.marks, symbol='↑')
+        mark = create_error_indicator_array(len(line), result.indicators, symbol='↑')
         print("", ''.join(mark))
         print((' '*(mark.index("↑") + 1)) + "[error]:", result.error)
 

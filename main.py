@@ -28,7 +28,7 @@ def main():
         print(f"error: Unknown format! Formats: {', '.join(FORMATS.keys())}")
         return
 
-    error_callback = FORMATS[sys.argv[1]]
+    error_callback = FORMATS[sys.argv[1]]()
     error_counter = ErrorCounter()
 
     files = sys.argv[2:]
