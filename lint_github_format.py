@@ -8,7 +8,7 @@ def result_github_output():
     """ Simple github callback
     """
     headers = [] # used to check if the file already has a header
-    def inner(file_path: str, lnr: int, line: str, result: Result):
+    def result(file_path: str, lnr: int, line: str, result: Result):
         if not file_path in headers:
             headers.append(file_path)
             print(f"## `🐛 {file_path}`")
@@ -26,4 +26,6 @@ def result_github_output():
         print("```")
         if result.suggestion is not None:
             print(f"> **Note**(**suggested**): `{result.suggestion}`")
-    return inner
+    return {
+        "result": result
+    }

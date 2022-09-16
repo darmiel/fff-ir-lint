@@ -8,11 +8,18 @@ from lint import ErrorCounter, Result
 
 from lint_simple_format import result_simple_output
 from lint_github_format import result_github_output
+from lint_github_2_format import result_github_2_output
 
 FORMATS = {
     "simple": result_simple_output,
-    "github": result_github_output
+    "github": result_github_output,
+    "github2": result_github_2_output,
 }
+
+def unused(*args):
+    """ Dummy callback
+    """
+    _ = args
 
 def main():
     """ Main entrypoint
@@ -28,7 +35,12 @@ def main():
         print(f"error: Unknown format! Formats: {', '.join(FORMATS.keys())}")
         return
 
-    error_callback = FORMATS[sys.argv[1]]()
+    fmt = FORMATS[sys.argv[1]]()
+    error_callback = fmt.get("result") or unused
+    file_start_callback = fmt.get("file_start") or unused
+    file_done_callback = fmt.get("file_done") or unused
+    all_done_callback = fmt.get("all_done") or unused
+
     error_counter = ErrorCounter()
 
     files = sys.argv[2:]
@@ -39,10 +51,7 @@ def main():
     for index, file in enumerate(files):
         error_counter.reset_file()
 
-        # print header
-        header = f"[lint] checking '{file}' [{index+1}/{len(files)}]"
-        print('*'*len(header))
-        print(header)
+        file_start_callback(file, index, len(files))
 
         # proxy callback to count warnings
         # then pass callback to "real" error_callback
@@ -52,12 +61,12 @@ def main():
 
         with open(file, "r", encoding='UTF-8') as file_descriptor:
             check_file(file, file_descriptor, proxy_callback)
+        
+        file_done_callback(file, error_counter)
 
-        print(f"[lint] found {error_counter.file_count} warnings/errors in file.")
-        print('*'*len(header))
-        print()
+    all_done_callback(error_counter)
 
-    print(f"[lint] found a total of {error_counter.total_count} warnings/errors")
+    print(f"\n[lint] found a total of {error_counter.total_count} warnings/errors")
 
     if error_counter.total_count != 0:
         sys.exit('[lint] found warnings/errors')
