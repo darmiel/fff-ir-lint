@@ -48,7 +48,7 @@ Error in line 19
 
 ## CI/CD
 
-An example GitHub Actions Workflow can be found [here](tree/main/examples/gh_actions_pr_lint_review.yaml).
+An example GitHub Actions Workflow can be found [here](./examples/gh_actions_pr_lint_review.yaml).
 
 The linter should work in a CI/CD pipeline.
 Just put the example in your repo under the `.github/workflows` directory and 
