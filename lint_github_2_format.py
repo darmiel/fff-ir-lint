@@ -41,6 +41,8 @@ class GitHubFormatTwo:
             # print suggestion
             if result.result.suggestion is not None:
                 print(f"> **Note**(**suggested**): `{result.result.suggestion}`")
+            
+            print()
 
 def result_github_2_output():
     """ Simple github callback 2

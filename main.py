@@ -10,6 +10,8 @@ from lint_simple_format import result_simple_output
 from lint_github_format import result_github_output
 from lint_github_2_format import result_github_2_output
 
+from glob import glob
+
 FORMATS = {
     "simple": result_simple_output,
     "github": result_github_output,
@@ -45,6 +47,14 @@ def main():
     if len(files) <= 0:
         print("[lint] no files to check")
         return
+
+    removes = []
+    for file in files:
+        if file.startswith("glob:"):
+            files.extend(glob(file[5:], recursive=True))
+            removes.append(file)
+    for remove in removes:
+        files.remove(remove)
 
     error_counter = ErrorCounter()
     for index, file in enumerate(files):

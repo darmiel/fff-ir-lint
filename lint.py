@@ -261,7 +261,7 @@ class DescriptorCheck(Check):
         self.version_pattern = re.compile(r"^Version:\s\d+$")
 
     def check(self, ctx: Context, lnr: int, line: str) -> Result:
-        if lnr == 1 and line != "Filetype: IR signals file":
+        if lnr == 1 and line != "Filetype: IR signals file" and line != "Filetype: IR library file":
             return sirf(0, "first line must contain 'Filetype: IR signals file'",
                 suggestion='Filetype: IR signals file')
         if lnr == 2 and not self.version_pattern.match(line):
@@ -274,7 +274,7 @@ class NonASCIICheck(Check):
     """
     def __init__(self) -> None:
         super().__init__()
-        self.pattern = re.compile(r"[^\x20-\x7E]")
+        self.pattern = re.compile(r"[^\x20-\x7E\xB0\x09]")
 
     def check(self, ctx: Context, lnr: int, line: str) -> Result:
         resp = []
@@ -286,7 +286,8 @@ class NonASCIICheck(Check):
             # if we remove non-ASCII chars there's probably some double spaces ['  ']
             while '  ' in suggestion:
                 suggestion = suggestion.replace('  ', ' ')
-            return mir(resp, "non-ASCII character/s found", suggestion=suggestion)
+            return mir(resp, "non-ASCII character/s found", suggestion=suggestion) \
+                .with_exit_rule(EXIT_CURRENT_LINE)
         return None
 
 class KeyValueValidityCheck(Check):
@@ -378,9 +379,9 @@ class SignalKeyOrderCheck(Check):
         }
 
     def check(self, ctx: Context, lnr: int, line: str) -> Result:
-        split = line.split(":", 2)
+        split = line.split(":", 1)
         if len(split) != 2:
-            return sirf(0, "cannot unpack key-value")
+            return sirf(0, f"cannot unpack key-value {len(split)} > 2")
         key, value = split
         key, value = key.strip(), value.strip()
 
@@ -431,6 +432,103 @@ class SignalKeyOrderCheck(Check):
 
         return None
 
+class DataValidityCheck(Check):
+    """ Checks if the data is valid
+
+    protocol: NECexf
+              ^^^^^^ (should be NECext)
+
+    data: 100 213 1-1 42
+                   ^
+
+    address: 10 FG FF AA
+                 ^
+    """
+    def __init__(self) -> None:
+        super().__init__()
+        self.space_pattern = re.compile("\\s+")
+        self.valid_protocols = [
+            "RC6",
+            "RC5",
+            "RC5X",
+            "NEC",
+            "NECext",
+            "NEC42",
+            "NEC42ext",
+            "SIRC",
+            "SIRC15",
+            "SIRC20",
+            "Samsung32"
+        ]
+
+    def ignore_if_failed(self) -> list:
+        return [KeyValueValidityCheck]
+
+    def check_data(self, key: str, value: str) -> List[ErrorIndicator]:
+        marks = []
+        begin = True
+        for idx, char in enumerate(value):
+            if char == ' ':
+                begin = True
+                continue
+            if char == "-" and begin:
+                begin = False
+                continue
+            if not char.isdigit():
+                indicator_index = len(key) + 1 + idx
+                marks.append(ErrorIndicator(indicator_index, indicator_index + 1))
+            begin = False
+        return marks
+
+    def check_hex(self, key: str, value: str) -> List[ErrorIndicator]:
+        marks = []
+        begin = True
+        for idx, char in enumerate(value):
+            if char == ' ':
+                begin = True
+                continue
+            if char not in "0123456789ABCDEFabcdef":
+                indicator_index = len(key) + 1 + idx
+                marks.append(ErrorIndicator(indicator_index, indicator_index + 1))
+        return marks
+
+    def check(self, ctx: Context, lnr: int, line: str) -> Result:
+        split = line.split(":", 1)
+        if len(split) != 2:
+            return sirf(0, "cannot unpack key-value")
+        key, value = split
+
+        value_start = line.index(value.strip(), len(key))
+
+        if key == "data":
+            marks = self.check_data(key, value)
+            if len(marks) > 0:
+                return mir(marks, "character not allowed here (non-Digit)")
+
+        elif key in ("address", "command"):
+            marks = self.check_hex(key, value)
+            if len(marks) > 0:
+                return mir(marks, "character not allowed here (non-HEX)")
+
+        elif key == "protocol":
+            if value.strip() not in self.valid_protocols:
+                similar = get_close_matches(value, self.valid_protocols)
+                suggestion = None
+                if len(similar) > 0:
+                    suggestion = f"{key}: {similar[0]}"
+                return sirf(value_start, 
+                    f"Protocol '{value.strip()}' unknown", suggestion=suggestion)
+        
+        elif key == "duty_cycle":
+            try:
+                float_value = float(value.strip())
+                if float_value < 0 or float_value > 1:
+                    return sirf(value_start, "duty_cycle must be between 0.0 and 1.0")
+            except ValueError:
+                return sirf(value_start, "duty_cycle must be a float")
+        
+        return None
+
 ###
 
 def check_file(file_path: str, file_descriptor: TextIOWrapper, on_found = None) -> bool:
@@ -443,9 +541,10 @@ def check_file(file_path: str, file_descriptor: TextIOWrapper, on_found = None) 
         WhiteSpaceCommentCheck(),
         WhiteSpaceCheck(),
         DescriptorCheck(),
-        NonASCIICheck(),
         KeyValueValidityCheck(),
         SignalKeyOrderCheck(),
+        DataValidityCheck(),
+        NonASCIICheck(),
     ]
 
     # these checks are applied to commented lines

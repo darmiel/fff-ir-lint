@@ -13,6 +13,12 @@ Finds common mistakes in `.ir` files ([FlipperFormat](https://github.com/Eng1n33
 $ python3 main.py <format> [file 1] [file 2] ... [file n]
 ```
 
+> **Note**: You can use glob-pattern by prefixing `glob:`
+
+```shell
+$ python3 main.py <format> 'glob:**/*.ir'
+```
+
 ## Formats
 
 ### GitHub

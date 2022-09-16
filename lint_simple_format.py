@@ -31,7 +31,7 @@ def result_simple_output():
         print()
 
     return {
-        "header": header,
         "result": result,
+        "file_start": header,
         "file_done": summary,
     }
