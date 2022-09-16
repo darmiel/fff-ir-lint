@@ -20,7 +20,7 @@ def result_github_output():
         # print line number
         print(f"# Line {lnr}:")
         print(f"- {line}")
-        print(" ", create_error_indicator_str(len(line), result.marks))
+        print(" ", create_error_indicator_str(len(line), result.indicators))
         print(f"@@ {result.error} @@")
 
         print("```")
