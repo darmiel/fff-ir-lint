@@ -5,32 +5,29 @@
 
 Finds common mistakes in `.ir` files ([FlipperFormat](https://github.com/Eng1n33r/flipperzero-firmware/tree/dev/lib/flipper_format)).
 
-## Usage
+**DOES NOT AUTOMATICALLY FIX ANY ERRORS**
 
-> **Note**: No dependencies needed. (`sys`, `re`, `io`, `typing`, `difflib`)
+## Usage
 
 ```shell
 $ python3 main.py <format> [file 1] [file 2] ... [file n]
+$ python3 main.py <format> 'glob:**/*.ir'
 ```
 
 > **Note**: You can use glob-pattern by prefixing `glob:`
-
-```shell
-$ python3 main.py <format> 'glob:**/*.ir'
-```
 
 ## Formats
 
 ### GitHub
 
-> **Note**: Specify `github` or `github2` for format
+> Specify `github` or `github2` *(newer)* for format
 
 ![GitHub-Dark](./assets/gh_dark.png#gh-dark-mode-only)
 ![GitHub-Light](./assets/gh_light.png#gh-light-mode-only)
 
 ### Simple
 
-> **Note**: Specify `simple` for format
+> Specify `simple` for format
 
 ```
 → python3 main.py simple remote.ir
