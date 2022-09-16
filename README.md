@@ -17,16 +17,17 @@ $ python3 main.py <format> [file 1] [file 2] ... [file n]
 
 ### GitHub
 
-> **Note**: Specify `github` for format
+> **Note**: Specify `github` or `github2` for format
 
-![img](./assets/format_github.png)
+![GitHub-Dark](./assets/gh_dark.png#gh-dark-mode-only)
+![GitHub-Light](./assets/gh_light.png#gh-light-mode-only)
 
 ### Simple
 
 > **Note**: Specify `simple` for format
 
 ```
-→ python3 main.py simple remote.ir                                                           [18f2be4]
+→ python3 main.py simple remote.ir
 *********************************
 [lint] checking 'remote.ir' [1/1]
 Error in line 19
@@ -44,3 +45,16 @@ Error in line 19
 [lint] found 2 warnings/errors in file.
 *********************************
 ```
+
+## CI/CD
+
+An example GitHub Actions Workflow can be found [here](tree/main/examples/gh_actions_pr_lint_review.yaml).
+
+The linter should work in a CI/CD pipeline.
+Just put the example in your repo under the `.github/workflows` directory and 
+[enable](https://docs.github.com/en/actions/managing-workflow-runs/disabling-and-enabling-a-workflow)
+actions in the repo if necessary.
+
+If a pull request is created in which `.ir` files are modified, the linter checks the modified (or newly created) `.ir` files.
+
+If errors are found, they are appended as a comment to the PR and the PR is set to **Requested Changes**.
