@@ -40,6 +40,12 @@ class ErrorIndicator:
         if self.end == -1:
             self.end = len(line)
 
+    def to_obj(self):
+        return {
+            "start": self.start,
+            "end": self.end,
+        }
+
 def create_error_indicator_array(
     length: int, indicators: List[ErrorIndicator], symbol='^'
 ) -> List[str]:
@@ -101,6 +107,14 @@ class Result:
         """
         self.exit_rule = exit_rule
         return self
+
+    def to_obj(self):
+        return {
+            "exit_rule": self.exit_rule,
+            "indicators": [z.to_obj() for z in self.indicators],
+            "error": self.error,
+            "suggestion": self.suggestion
+        }
 
 def multi_indicator_result(
     indicators: List[ErrorIndicator], error: str, suggestion: str = None

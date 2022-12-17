@@ -9,6 +9,7 @@ from lint import ErrorCounter, Result
 from lint_simple_format import result_simple_output
 from lint_github_format import result_github_output
 from lint_github_2_format import result_github_2_output
+from lint_json_format import result_json_output
 
 from glob import glob
 
@@ -16,6 +17,7 @@ FORMATS = {
     "simple": result_simple_output,
     "github": result_github_output,
     "github2": result_github_2_output,
+    "json": result_json_output,
 }
 
 def unused(*args):
@@ -28,7 +30,7 @@ def main():
     """
 
     # print syntax
-    if len(sys.argv) == 0:
+    if len(sys.argv) <= 1:
         print("$ python3 main.py <format> [file_1] [file_2] ... [file_n]")
         print(f"Formats: {', '.join(FORMATS.keys())}")
         sys.exit(1)
@@ -75,10 +77,8 @@ def main():
 
     all_done_callback(error_counter)
 
-    print(f"\n[lint] found a total of {error_counter.total_count} warnings/errors")
-
     if error_counter.total_count != 0:
-        sys.exit('[lint] found warnings/errors')
+        sys.exit(f"\n[lint] found a total of {error_counter.total_count} warnings/errors")
 
 if __name__ == "__main__":
     main()

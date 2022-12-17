@@ -12,6 +12,14 @@ class FatResult:
         self.line = line
         self.result = result
 
+    def to_obj(self):
+        return {
+            "file": self.file_path,
+            "lnr": self.lnr,
+            "line": self.line,
+            "result": self.result.to_obj(),
+        }
+
 class Collector:
     """ Collector collects all results for all files for later use
     """
