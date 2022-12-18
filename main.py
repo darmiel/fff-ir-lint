@@ -2,7 +2,6 @@
 """
 
 import sys
-import json
 
 from lint import check_file
 from lint import ErrorCounter, Result
@@ -51,17 +50,19 @@ def main():
         print("[lint] no files to check")
         return
 
-    removes = []
-    for file in files:
-        if file.startswith("glob:"):
-            files.extend(glob(file[5:], recursive=True))
-            removes.append(file)
-        if file.startswith("json:"):
-            print("parsing", file[5:])
-            files.extend(json.loads(file[5:]))
-            removes.append(file)
-    for remove in removes:
-        files.remove(remove)
+    if files[0] == 'json':
+        import json
+        encoded = ' '.join(files[1:])
+        print("using encoded json:", encoded)
+        files.extend(json.loads(encoded))
+    else:
+        removes = []
+        for file in files:
+            if file.startswith("glob:"):
+                files.extend(glob(file[5:], recursive=True))
+                removes.append(file)
+        for remove in removes:
+            files.remove(remove)
 
     error_counter = ErrorCounter()
     for index, file in enumerate(files):
