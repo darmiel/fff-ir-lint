@@ -50,10 +50,11 @@ def main():
         print("[lint] no files to check")
         return
 
-    if files[0] == 'json':
+    if files[0] == 'json=':
+        files = files[1:]
+        # parse files as JSON input
         import json
         encoded = ' '.join(files[1:])
-        print("using encoded json:", encoded)
         files.extend(json.loads(encoded))
     else:
         removes = []
