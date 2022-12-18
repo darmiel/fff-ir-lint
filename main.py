@@ -54,7 +54,7 @@ def main():
         files = files[1:]
         # parse files as JSON input
         import json
-        encoded = ' '.join(files[1:])
+        encoded = ' '.join(files)
         files.extend(json.loads(encoded))
     else:
         removes = []
