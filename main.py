@@ -2,6 +2,7 @@
 """
 
 import sys
+import json
 
 from lint import check_file
 from lint import ErrorCounter, Result
@@ -54,6 +55,10 @@ def main():
     for file in files:
         if file.startswith("glob:"):
             files.extend(glob(file[5:], recursive=True))
+            removes.append(file)
+        if file.startswith("json:"):
+            print("parsing", file[5:])
+            files.extend(json.loads(file[5:]))
             removes.append(file)
     for remove in removes:
         files.remove(remove)
