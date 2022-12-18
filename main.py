@@ -51,11 +51,10 @@ def main():
         return
 
     if files[0] == 'json=':
-        files = files[1:]
         # parse files as JSON input
         import json
-        encoded = ' '.join(files)
-        files.extend(json.loads(encoded))
+        encoded = ' '.join(files[1:])
+        files = json.loads(encoded)
     else:
         removes = []
         for file in files:
