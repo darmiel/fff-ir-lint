@@ -59,8 +59,12 @@ def main():
         removes = []
         for file in files:
             if file.startswith("glob:"):
-                files.extend(glob(file[5:], recursive=True))
                 removes.append(file)
+                files.extend(glob(file[5:], recursive=True))
+            if file.startswith("file:"):
+                removes.append(file)
+                with open(file[5:], "r", encoding='utf-8') as fd:
+                    files.extend([z.strip() for z in fd.readlines() if len(z.strip()) > 0])
         for remove in removes:
             files.remove(remove)
 
