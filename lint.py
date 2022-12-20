@@ -9,6 +9,8 @@ from io import TextIOWrapper
 from typing import List
 from difflib import get_close_matches
 
+from config import get_name_pattern, get_name_rewrites, get_name_pattern_raw
+
 EXIT_NONE = 0
 EXIT_CURRENT_LINE = 1
 EXIT_ALL_LINES = 2
@@ -323,6 +325,7 @@ class KeyValueValidityCheck(Check):
             "frequency", "duty_cycle", "data" # raw signal
         ]
 
+
     def ignore_if_failed(self) -> list:
         """
         do not check if line 1 or 2 are not vaild
@@ -360,6 +363,7 @@ class KeyValueValidityCheck(Check):
             return sirt(len(key), f"key '{key}' unknown", suggestion=suggestion) \
                 .with_exit_rule(EXIT_NONE)
         ctx.set_last_key(key)
+
         return None
 
 class SignalKeyOrderCheck(Check):
@@ -476,6 +480,13 @@ class DataValidityCheck(Check):
             "Kaseikyo"
         ]
 
+        # load naming pattern from config
+        self.naming_pattern = get_name_pattern()
+        self.naming_pattern_raw = get_name_pattern_raw()
+
+        # load naming rewrites from config
+        self.naming_rewrites = get_name_rewrites()
+
     def ignore_if_failed(self) -> list:
         return [KeyValueValidityCheck]
 
@@ -541,7 +552,18 @@ class DataValidityCheck(Check):
                     return sirf(value_start, "duty_cycle must be between 0.0 and 1.0")
             except ValueError:
                 return sirf(value_start, "duty_cycle must be a float")
+
+        elif key == "name":
+            # check for rewrite
+            stripped = value.strip().lower()
+            if stripped in self.naming_rewrites:
+                suggested = self.naming_rewrites[stripped]
+                return sirf(value_start, f"name should be {suggested}", suggestion=f"name: {suggested}")
         
+            # check pattern 
+            stripped = value.strip()
+            if self.naming_pattern_raw is not None and self.naming_pattern_raw != '' and not self.naming_pattern.match(stripped):
+                return sirf(value_start, f"naming does not match pattern {self.naming_pattern_raw}")
         return None
 
 ###
