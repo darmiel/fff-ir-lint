@@ -473,7 +473,8 @@ class DataValidityCheck(Check):
             "SIRC15",
             "SIRC20",
             "Samsung32",
-            "Kaseikyo"
+            "Kaseikyo",
+            "RCA"
         ]
 
     def ignore_if_failed(self) -> list:
