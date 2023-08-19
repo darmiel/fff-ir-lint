@@ -20,7 +20,6 @@ EXIT_CURRENT_CHECK_FOR_ALL_LINES = 3
 _config: Config
 if config_file := os.getenv("LINTER_CONFIG"):
     _config = load_config(config_file)
-    print("[lint] loaded config file:", config_file)
 else:
     _config = empty_config()
 
