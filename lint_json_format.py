@@ -7,6 +7,7 @@ from typing import List
 from lint import ErrorCounter
 from lint_collector_format import Collector, FatResult
 
+
 class JsonFormat:
     def __init__(self) -> None:
         self.collector = Collector()
@@ -24,9 +25,10 @@ class JsonFormat:
         for res in obj:
             res.pop("file")
         self.files[file_path].extend(obj)
-    
+
     def all_done_callback(self, _: ErrorCounter) -> None:
         print(json.dumps(self.files, indent=4))
+
 
 def result_json_output():
     fmt = JsonFormat()

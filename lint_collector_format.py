@@ -3,9 +3,11 @@
 
 from lint import Result
 
+
 class FatResult:
     """ FatResult is a data class for result values
     """
+
     def __init__(self, file_path: str, lnr: int, line: str, result: Result) -> None:
         self.file_path = file_path
         self.lnr = lnr
@@ -20,9 +22,11 @@ class FatResult:
             "result": self.result.to_obj(),
         }
 
+
 class Collector:
     """ Collector collects all results for all files for later use
     """
+
     def __init__(self) -> None:
         self.results = {}
 
@@ -32,4 +36,3 @@ class Collector:
         if file_path not in self.results:
             self.results[file_path] = []
         self.results[file_path].append(FatResult(file_path, lnr, line, result))
-
