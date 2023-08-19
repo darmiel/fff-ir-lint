@@ -42,7 +42,7 @@ class GitHubFormatTwo:
 
             # print suggestion
             if result.result.suggestion is not None:
-                print(f"> **Note**(**suggested**): `{result.result.suggestion}`")
+                print(f"> (**suggestion**): `{result.result.suggestion}`")
 
             print()
 

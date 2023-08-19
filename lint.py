@@ -503,12 +503,13 @@ class DataValidityCheck(Check):
             "Kaseikyo",
             "RCA"
         ]
+        self.frequency_range = (10_000, 56_000)
 
     def ignore_if_failed(self) -> list:
         return [KeyValueValidityCheck]
 
     @staticmethod
-    def check_data(key: str, value: str) -> List[ErrorIndicator]:
+    def check_key_data(key: str, value: str) -> Optional[Result]:
         marks = []
         begin = True
         for idx, char in enumerate(value):
@@ -522,10 +523,11 @@ class DataValidityCheck(Check):
                 indicator_index = len(key) + 1 + idx
                 marks.append(ErrorIndicator(indicator_index, indicator_index + 1))
             begin = False
-        return marks
+        if len(marks) > 0:
+            return mir(marks, "character not allowed here (non-Digit)")
 
     @staticmethod
-    def check_hex(key: str, value: str) -> List[ErrorIndicator]:
+    def check_value_hex(key: str, value: str) -> Optional[Result]:
         marks = []
         for idx, char in enumerate(value):
             if char == ' ':
@@ -533,42 +535,59 @@ class DataValidityCheck(Check):
             if char not in "0123456789ABCDEFabcdef":
                 indicator_index = len(key) + 1 + idx
                 marks.append(ErrorIndicator(indicator_index, indicator_index + 1))
-        return marks
+        if len(marks) > 0:
+            return mir(marks, "character not allowed here (non-HEX)")
+
+    def check_key_protocol(self, key: str, value: str, value_start: int) -> Optional[Result]:
+        if value.strip() not in self.valid_protocols:
+            similar = get_close_matches(value, self.valid_protocols)
+            suggestion = None
+            if len(similar) > 0:
+                suggestion = f"{key}: {similar[0]}"
+            return sirf(value_start,
+                        f"Protocol '{value.strip()}' unknown", suggestion=suggestion)
+
+    @staticmethod
+    def check_key_duty_cycle(value: str, value_start: int) -> Optional[Result]:
+        try:
+            float_value = float(value.strip())
+            if float_value < 0 or float_value > 1:
+                return sirf(value_start, "duty_cycle must be between 0.0 and 1.0")
+        except ValueError:
+            return sirf(value_start, "duty_cycle must be a float")
+
+    def check_key_frequency(self, key: str, value: str, value_start: int) -> Optional[Result]:
+        try:
+            frequency_value = int(value.strip())
+            freq_min, freq_max = self.frequency_range
+            if frequency_value < freq_min or frequency_value > freq_max:
+                suggestion = f"{key}: {max(min(freq_max, frequency_value), freq_min)}"
+                return sirf(value_start, f"frequency outside of supported range ({freq_min} - {freq_max})",
+                            suggestion=suggestion)
+        except ValueError:
+            return sirf(value_start, "frequency must be an integer")
 
     def check(self, ctx: Context, lnr: int, line: str) -> Optional[Result]:
         split = line.split(":", 1)
         if len(split) != 2:
             return sirf(0, "cannot unpack key-value")
         key, value = split
-
         value_start = line.index(value.strip(), len(key))
 
         if key == "data":
-            marks = self.check_data(key, value)
-            if len(marks) > 0:
-                return mir(marks, "character not allowed here (non-Digit)")
+            return self.check_key_data(key, value)
 
         elif key in ("address", "command"):
-            marks = self.check_hex(key, value)
-            if len(marks) > 0:
-                return mir(marks, "character not allowed here (non-HEX)")
+            return self.check_value_hex(key, value)
 
         elif key == "protocol":
-            if value.strip() not in self.valid_protocols:
-                similar = get_close_matches(value, self.valid_protocols)
-                suggestion = None
-                if len(similar) > 0:
-                    suggestion = f"{key}: {similar[0]}"
-                return sirf(value_start,
-                            f"Protocol '{value.strip()}' unknown", suggestion=suggestion)
+            return self.check_key_protocol(key, value, value_start)
 
         elif key == "duty_cycle":
-            try:
-                float_value = float(value.strip())
-                if float_value < 0 or float_value > 1:
-                    return sirf(value_start, "duty_cycle must be between 0.0 and 1.0")
-            except ValueError:
-                return sirf(value_start, "duty_cycle must be a float")
+            return self.check_key_duty_cycle(value, value_start)
+
+        elif key == "frequency":
+            return self.check_key_frequency(key, value, value_start)
 
         return None
 
