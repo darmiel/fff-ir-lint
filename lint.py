@@ -3,14 +3,26 @@ roughly checks an .ir file for errors.
 no warranty.
 """
 
+import os
 import re
 from difflib import get_close_matches
 from typing import List, TextIO, Optional
+
+from config import Config, load_config, empty_config
 
 EXIT_NONE = 0
 EXIT_CURRENT_LINE = 1
 EXIT_ALL_LINES = 2
 EXIT_CURRENT_CHECK_FOR_ALL_LINES = 3
+
+###
+
+_config: Config
+if config_file := os.getenv("LINTER_CONFIG"):
+    _config = load_config(config_file)
+    print("[lint] loaded config file:", config_file)
+else:
+    _config = empty_config()
 
 
 ###
@@ -198,7 +210,7 @@ class Check:
     def __init__(self) -> None:
         self.active = True
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Optional[Result]:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         """ Check `line` against current check
         """
 
@@ -221,7 +233,7 @@ class EmptyLineCheck(Check):
     """ Checks for empty lines
     """
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Optional[Result]:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         if len(line.strip()) == 0:
             return sir(0, 1,
                        "empty lines are not allowed. use comments for separation", suggestion="#"
@@ -235,7 +247,7 @@ class WhiteSpaceCommentCheck(Check):
      ^^
     """
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Optional[Result]:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         if line.strip().startswith("#") and not line.startswith("#"):
             return sirt(
                 line.index("#"), "white space before comment not allowed", suggestion=line.strip()
@@ -258,7 +270,7 @@ class WhiteSpaceCheck(Check):
     def ignore_if_failed(self) -> list:
         return [WhiteSpaceCommentCheck]
 
-    def check(self, ctx: Context, _: int, line: str) -> Optional[Result]:
+    def check(self, ctx: Context, file_path: str, _: int, line: str) -> Optional[Result]:
         # start of line
         res = self.start_pattern.findall(line)
         if len(res) > 0:
@@ -293,7 +305,7 @@ class DescriptorCheck(Check):
         super().__init__()
         self.version_pattern = re.compile(r"^Version:\s\d+$")
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Optional[Result]:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         if lnr == 1 and line != "Filetype: IR signals file" and line != "Filetype: IR library file":
             return sirf(0, "first line must contain 'Filetype: IR signals file'",
                         suggestion='Filetype: IR signals file')
@@ -311,7 +323,7 @@ class NonASCIICheck(Check):
         super().__init__()
         self.pattern = re.compile(r"[^\x20-\x7E\xB0\x09]")
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Optional[Result]:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         resp = []
         for search in self.pattern.finditer(line):
             span = search.span()
@@ -348,17 +360,17 @@ class KeyValueValidityCheck(Check):
 
     def ignore_if_failed(self) -> list:
         """
-        do not check if line 1 or 2 are not vaild
+        do not check if line 1 or 2 are not valid
         """
         return [DescriptorCheck]
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Optional[Result]:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         # parse key
         if ':' not in line:
             return sirf(0, "line is no key-value pair. 'key: value' expected") \
                 .with_exit_rule(EXIT_CURRENT_LINE)
 
-        # check that value starts witih ' '
+        # check that value starts with ' '
         # 'name:value' should be 'name: value'
         value_start_index = line.index(":") + 1
         if not line[value_start_index:].startswith(' '):
@@ -417,7 +429,7 @@ class SignalKeyOrderCheck(Check):
             "data": ["data", "name"]
         }
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Optional[Result]:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         split = line.split(":", 1)
         if len(split) != 2:
             return sirf(0, f"cannot unpack key-value {len(split)} > 2")
@@ -567,7 +579,15 @@ class DataValidityCheck(Check):
         except ValueError:
             return sirf(value_start, "frequency must be an integer")
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Optional[Result]:
+    @staticmethod
+    def check_key_name(file_path: str, key: str, value: str, value_start: int) -> Optional[Result]:
+        name_check = value.strip()
+        if new_name := _config.name_check_config.get_name_rewrite(file_path, name_check.lower()):
+            if new_name != name_check:
+                suggestion = f"{key}: {new_name}"
+                return sirf(value_start, f"name should be '{new_name}'", suggestion=suggestion)
+
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         split = line.split(":", 1)
         if len(split) != 2:
             return sirf(0, "cannot unpack key-value")
@@ -588,6 +608,9 @@ class DataValidityCheck(Check):
 
         elif key == "frequency":
             return self.check_key_frequency(key, value, value_start)
+
+        elif key == "name":
+            return self.check_key_name(file_path, key, value, value_start)
 
         return None
 
@@ -619,7 +642,7 @@ def check_file(file_path: str, file_descriptor: TextIO, on_found=None) -> bool:
     context = Context()
 
     for _lnr, line in enumerate([z.strip("\n") for z in file_descriptor.readlines()]):
-        lnr = _lnr + 1  # human readable line numbers
+        lnr = _lnr + 1  # human-readable line numbers
 
         # comments
         if line.startswith("#"):
@@ -633,7 +656,7 @@ def check_file(file_path: str, file_descriptor: TextIO, on_found=None) -> bool:
                 continue
 
             # execute check
-            resp: Result = check.check(context, lnr, line)
+            resp: Result = check.check(context, file_path, lnr, line)
 
             # if check passed, do nothing
             if resp is None:
