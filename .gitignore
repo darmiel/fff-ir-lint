@@ -1,5 +1,9 @@
 /__pycache__
 
-# don't ask why.
+.vscode/
+.idea/
+
+# some test data I don't want to accidently commit :)
 /examples/Flipper-IRDB
-/Flipper-IRDB-official
+Flipper-IRDB-official/
+Flipper-IRDB/

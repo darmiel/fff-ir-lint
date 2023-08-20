@@ -6,6 +6,7 @@ from typing import List
 from lint import ErrorCounter, create_error_indicator_str
 from lint_collector_format import Collector, FatResult
 
+
 class GitHubFormatTwo:
     """ GitHub-Markdown Format using Collector
 
@@ -15,6 +16,7 @@ class GitHubFormatTwo:
     ```
     > Note(Suggestion): `%s`
     """
+
     def __init__(self) -> None:
         self.collector = Collector()
 
@@ -24,12 +26,12 @@ class GitHubFormatTwo:
         results: List[FatResult] = self.collector.results.get(file_path)
         if results is None:
             return
-        
+
         print(f"## `🐛 {file_path}` [{len(results)} errors]")
         for i, result in enumerate(results):
-            if i != 0: # print separator
+            if i != 0:  # print separator
                 print("\n---\n")
-            
+
             # print diff with error
             print("```diff")
             print(f"# Line {result.lnr}:")
@@ -40,9 +42,10 @@ class GitHubFormatTwo:
 
             # print suggestion
             if result.result.suggestion is not None:
-                print(f"> **Note**(**suggested**): `{result.result.suggestion}`")
-            
+                print(f"> (**suggestion**): `{result.result.suggestion}`")
+
             print()
+
 
 def result_github_2_output():
     """ Simple github callback 2

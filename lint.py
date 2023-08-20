@@ -3,16 +3,26 @@ roughly checks an .ir file for errors.
 no warranty.
 """
 
+import os
 import re
-
-from io import TextIOWrapper
-from typing import List
 from difflib import get_close_matches
+from typing import List, TextIO, Optional
+
+from config import Config, load_config, empty_config
 
 EXIT_NONE = 0
 EXIT_CURRENT_LINE = 1
 EXIT_ALL_LINES = 2
 EXIT_CURRENT_CHECK_FOR_ALL_LINES = 3
+
+###
+
+_config: Config
+if config_file := os.getenv("LINTER_CONFIG"):
+    _config = load_config(config_file)
+else:
+    _config = empty_config()
+
 
 ###
 
@@ -23,6 +33,7 @@ class ErrorIndicator:
             ^
     [start: 7, end: 8 => '0']
     """
+
     def __init__(self, start: int, end: int) -> None:
         self.start = start
         self.end = end
@@ -46,8 +57,9 @@ class ErrorIndicator:
             "end": self.end,
         }
 
+
 def create_error_indicator_array(
-    length: int, indicators: List[ErrorIndicator], symbol='^'
+        length: int, indicators: List[ErrorIndicator], symbol='^'
 ) -> List[str]:
     """ Create ErrorIndicator character array for input of length `length`
 
@@ -56,7 +68,7 @@ def create_error_indicator_array(
 
     Attributes:
         length: Minimum length of the array
-        marks: List of Marks
+        indicators: List of indicators
         symbol: Symbol to fill if index in marks
     """
     res = [' '] * length
@@ -67,12 +79,14 @@ def create_error_indicator_array(
             res[indicator.end - i - 1] = symbol
     return res
 
+
 def create_error_indicator_str(length: int, indicators: List[ErrorIndicator]) -> str:
     """ Combines ErrorIndicator character array to single string
 
     Returns a string with the values from array joined with ''
     """
     return ''.join(create_error_indicator_array(length, indicators))
+
 
 ###
 
@@ -83,8 +97,8 @@ class Result:
     """
 
     def __init__(self,
-        exit_rule: int, indicators: List[ErrorIndicator], error: str, suggestion: str
-    ) -> None:
+                 exit_rule: int, indicators: List[ErrorIndicator], error: str, suggestion: str
+                 ) -> None:
         self.exit_rule = exit_rule
         self.indicators = indicators
         self.error = error
@@ -116,8 +130,9 @@ class Result:
             "suggestion": self.suggestion
         }
 
+
 def multi_indicator_result(
-    indicators: List[ErrorIndicator], error: str, suggestion: str = None
+        indicators: List[ErrorIndicator], error: str, suggestion: str = None
 ) -> Result:
     """ Result with multiple ErrorIndicators
 
@@ -126,8 +141,9 @@ def multi_indicator_result(
     """
     return Result(-1, indicators, error, suggestion)
 
+
 def single_indicator_result(
-    mark_from: int, mark_to: int, error: str, suggestion: str = None
+        mark_from: int, mark_to: int, error: str, suggestion: str = None
 ) -> Result:
     """ Result with single ErrorIndicator
 
@@ -136,21 +152,25 @@ def single_indicator_result(
     """
     return multi_indicator_result([ErrorIndicator(mark_from, mark_to)], error, suggestion)
 
+
 def single_indicator_result_from(mark_from: int, error: str, suggestion: str = None) -> Result:
     """ Result with single ErrorIndicator starting from `mark_from`
     """
     return single_indicator_result(mark_from, -1, error, suggestion)
+
 
 def single_indicator_result_to(mark_to: int, error: str, suggestion: str = None) -> Result:
     """ Result with single ErrorIndicator from start to `mark_to`
     """
     return single_indicator_result(0, mark_to, error, suggestion)
 
+
 # aliases
 mir = multi_indicator_result
 sir = single_indicator_result
 sirf = single_indicator_result_from
 sirt = single_indicator_result_to
+
 
 ###
 
@@ -159,6 +179,7 @@ class Context:
 
     Can be used to check if another check already failed or to store data between checks
     """
+
     def __init__(self) -> None:
         self.result = {}
         self.last_key = None
@@ -178,6 +199,7 @@ class Context:
         """
         self.last_key = key
 
+
 ###
 
 class Check:
@@ -187,7 +209,7 @@ class Check:
     def __init__(self) -> None:
         self.active = True
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Result:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         """ Check `line` against current check
         """
 
@@ -205,43 +227,49 @@ class Check:
         """
         return self.active
 
+
 class EmptyLineCheck(Check):
     """ Checks for empty lines
     """
-    def check(self, ctx: Context, lnr: int, line: str) -> Result:
+
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         if len(line.strip()) == 0:
-            return sir(0, 1, \
-                "empty lines are not allowed. use comments for separation", suggestion="#"
-            ).with_exit_rule(EXIT_CURRENT_LINE)
+            return sir(0, 1,
+                       "empty lines are not allowed. use comments for separation", suggestion="#"
+                       ).with_exit_rule(EXIT_CURRENT_LINE)
         return None
+
 
 class WhiteSpaceCommentCheck(Check):
     """ Checks for white space before comments
     '  # test'
      ^^
     """
-    def check(self, ctx: Context, lnr: int, line: str) -> Result:
+
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         if line.strip().startswith("#") and not line.startswith("#"):
             return sirt(
                 line.index("#"), "white space before comment not allowed", suggestion=line.strip()
             ).with_exit_rule(EXIT_CURRENT_LINE)
         return None
 
+
 class WhiteSpaceCheck(Check):
     """ Checks for whitespace at the end of a line
     'name: test '
                ^
     """
+
     def __init__(self) -> None:
         super().__init__()
-        self.start_pattern = re.compile(r"^([\s]+)")
-        self.end_pattern = re.compile(r"([\s]+)$")
+        self.start_pattern = re.compile(r"^(\s+)")
+        self.end_pattern = re.compile(r"(\s+)$")
         self.multi_space_pattern = re.compile(r"\s{2,}")
 
     def ignore_if_failed(self) -> list:
         return [WhiteSpaceCommentCheck]
 
-    def check(self, ctx: Context, _: int, line: str) -> Result:
+    def check(self, ctx: Context, file_path: str, _: int, line: str) -> Optional[Result]:
         # start of line
         res = self.start_pattern.findall(line)
         if len(res) > 0:
@@ -250,7 +278,7 @@ class WhiteSpaceCheck(Check):
         res = self.end_pattern.findall(line)
         if len(res) > 0:
             return sirf(len(line) - len(res[0]),
-                "lines cannot end with spaces", suggestion=line.rstrip(' '))
+                        "lines cannot end with spaces", suggestion=line.rstrip(' '))
         # check using 'strip'
         if line.strip() != line:
             return sirf(0, "lines cannot start or end with whitespace", suggestion=line.strip())
@@ -267,30 +295,34 @@ class WhiteSpaceCheck(Check):
         # all fine :)
         return None
 
+
 class DescriptorCheck(Check):
     """ Checks first two lines for expected .ir header
     """
+
     def __init__(self) -> None:
         super().__init__()
         self.version_pattern = re.compile(r"^Version:\s\d+$")
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Result:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         if lnr == 1 and line != "Filetype: IR signals file" and line != "Filetype: IR library file":
             return sirf(0, "first line must contain 'Filetype: IR signals file'",
-                suggestion='Filetype: IR signals file')
+                        suggestion='Filetype: IR signals file')
         if lnr == 2 and not self.version_pattern.match(line):
             return sirf(0, "second line must contain 'Version: \\d'",
-                suggestion='Version: 1')
+                        suggestion='Version: 1')
         return None
+
 
 class NonASCIICheck(Check):
     """ Checks a line for non-ASCII characters
     """
+
     def __init__(self) -> None:
         super().__init__()
         self.pattern = re.compile(r"[^\x20-\x7E\xB0\x09]")
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Result:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         resp = []
         for search in self.pattern.finditer(line):
             span = search.span()
@@ -304,6 +336,7 @@ class NonASCIICheck(Check):
                 .with_exit_rule(EXIT_CURRENT_LINE)
         return None
 
+
 class KeyValueValidityCheck(Check):
     """
     checks if an .ir file only contains valid key-value pairs
@@ -313,36 +346,37 @@ class KeyValueValidityCheck(Check):
     'test:abc'
      ^^^^^^^^
     """
+
     def __init__(self) -> None:
         super().__init__()
         self.pattern_str = r"^([A-Za-z-_]+):\s.+$"
         self.pattern = re.compile(self.pattern_str)
         self.valid_keys = [
-            "Filetype", "Version", # header
-            "name", "type", "protocol", "address", "command", # parsed signal
-            "frequency", "duty_cycle", "data" # raw signal
+            "Filetype", "Version",  # header
+            "name", "type", "protocol", "address", "command",  # parsed signal
+            "frequency", "duty_cycle", "data"  # raw signal
         ]
 
     def ignore_if_failed(self) -> list:
         """
-        do not check if line 1 or 2 are not vaild
+        do not check if line 1 or 2 are not valid
         """
         return [DescriptorCheck]
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Result:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         # parse key
-        if not ':' in line:
+        if ':' not in line:
             return sirf(0, "line is no key-value pair. 'key: value' expected") \
                 .with_exit_rule(EXIT_CURRENT_LINE)
 
-        # check that value starts witih ' '
+        # check that value starts with ' '
         # 'name:value' should be 'name: value'
         value_start_index = line.index(":") + 1
         if not line[value_start_index:].startswith(' '):
             # error but don't stop processing current line
             return sir(
                 value_start_index - 1, value_start_index, "space missing after ':'",
-                suggestion=line[:value_start_index] +" " + line[value_start_index:]
+                suggestion=line[:value_start_index] + " " + line[value_start_index:]
             )
 
         # check generic pattern
@@ -351,8 +385,8 @@ class KeyValueValidityCheck(Check):
 
         # check if key is valid
         key = line[:line.index(":")]
-        if not key in self.valid_keys:
-            # find best similar key
+        if key not in self.valid_keys:
+            # find the best similar key
             similar = get_close_matches(key, self.valid_keys)
             suggestion = None
             if len(similar) > 0:
@@ -362,6 +396,7 @@ class KeyValueValidityCheck(Check):
         ctx.set_last_key(key)
         return None
 
+
 class SignalKeyOrderCheck(Check):
     """ Check order of key-value pairs
 
@@ -369,12 +404,13 @@ class SignalKeyOrderCheck(Check):
     `name` must always be followed by `type`, `protocol` by `address` and so on.
     otherwise there will be problems
     """
+
     def __init__(self) -> None:
         super().__init__()
         self.ignored_order_keys = [
             "Filetype", "Version"
         ]
-        self.value_space_pattern = re.compile(r"^[\s]{3,}")
+        self.value_space_pattern = re.compile(r"^\s{3,}")
         self.expected_key = None
         self.order = {
             "name": "type",
@@ -392,7 +428,7 @@ class SignalKeyOrderCheck(Check):
             "data": ["data", "name"]
         }
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Result:
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         split = line.split(":", 1)
         if len(split) != 2:
             return sirf(0, f"cannot unpack key-value {len(split)} > 2")
@@ -411,7 +447,7 @@ class SignalKeyOrderCheck(Check):
             else:
                 break
 
-        if not key in self.order:
+        if key not in self.order:
             return sirt(key_end, "key has no order-rule") \
                 .with_exit_rule(EXIT_CURRENT_CHECK_FOR_ALL_LINES)
 
@@ -420,7 +456,7 @@ class SignalKeyOrderCheck(Check):
             self.expected_key = "name"
 
         if isinstance(self.expected_key, list):
-            if not key in self.expected_key:
+            if key not in self.expected_key:
                 return sirt(key_end, f"one of keys '{', '.join(self.expected_key)}' expected") \
                     .with_exit_rule(EXIT_CURRENT_CHECK_FOR_ALL_LINES)
         else:
@@ -431,20 +467,21 @@ class SignalKeyOrderCheck(Check):
                 ).with_exit_rule(EXIT_CURRENT_CHECK_FOR_ALL_LINES)
 
         next_expected = self.order[key]
-        if isinstance(next_expected, (str, list, )):
+        if isinstance(next_expected, (str, list,)):
             self.expected_key = next_expected
         elif isinstance(next_expected, dict):
-            if not value in next_expected:
+            if value not in next_expected:
                 e_k = ', '.join(next_expected.keys())
                 return sirf(value_start, f"[lint]: can't find next expected key in [{e_k}]") \
                     .with_exit_rule(EXIT_CURRENT_CHECK_FOR_ALL_LINES)
             self.expected_key = next_expected[value]
         else:
             return sirt(key_end,
-                "[lint]: something weird happened. Please create an issue on GitHub.") \
+                        "[lint]: something weird happened. Please create an issue on GitHub.") \
                 .with_exit_rule(EXIT_CURRENT_CHECK_FOR_ALL_LINES)
 
         return None
+
 
 class DataValidityCheck(Check):
     """ Checks if the data is valid
@@ -458,9 +495,10 @@ class DataValidityCheck(Check):
     address: 10 FG FF AA
                  ^
     """
+
     def __init__(self) -> None:
         super().__init__()
-        self.space_pattern = re.compile("\\s+")
+        self.space_pattern = re.compile(r"\s+")
         self.valid_protocols = [
             "RC6",
             "RC5",
@@ -476,11 +514,13 @@ class DataValidityCheck(Check):
             "Kaseikyo",
             "RCA"
         ]
+        self.frequency_range = (10_000, 56_000)
 
     def ignore_if_failed(self) -> list:
         return [KeyValueValidityCheck]
 
-    def check_data(self, key: str, value: str) -> List[ErrorIndicator]:
+    @staticmethod
+    def check_key_data(key: str, value: str) -> Optional[Result]:
         marks = []
         begin = True
         for idx, char in enumerate(value):
@@ -494,60 +534,89 @@ class DataValidityCheck(Check):
                 indicator_index = len(key) + 1 + idx
                 marks.append(ErrorIndicator(indicator_index, indicator_index + 1))
             begin = False
-        return marks
+        if len(marks) > 0:
+            return mir(marks, "character not allowed here (non-Digit)")
 
-    def check_hex(self, key: str, value: str) -> List[ErrorIndicator]:
+    @staticmethod
+    def check_value_hex(key: str, value: str) -> Optional[Result]:
         marks = []
-        begin = True
         for idx, char in enumerate(value):
             if char == ' ':
-                begin = True
                 continue
             if char not in "0123456789ABCDEFabcdef":
                 indicator_index = len(key) + 1 + idx
                 marks.append(ErrorIndicator(indicator_index, indicator_index + 1))
-        return marks
+        if len(marks) > 0:
+            return mir(marks, "character not allowed here (non-HEX)")
 
-    def check(self, ctx: Context, lnr: int, line: str) -> Result:
+    def check_key_protocol(self, key: str, value: str, value_start: int) -> Optional[Result]:
+        if value.strip() not in self.valid_protocols:
+            similar = get_close_matches(value, self.valid_protocols)
+            suggestion = None
+            if len(similar) > 0:
+                suggestion = f"{key}: {similar[0]}"
+            return sirf(value_start,
+                        f"Protocol '{value.strip()}' unknown", suggestion=suggestion)
+
+    @staticmethod
+    def check_key_duty_cycle(value: str, value_start: int) -> Optional[Result]:
+        try:
+            float_value = float(value.strip())
+            if float_value < 0 or float_value > 1:
+                return sirf(value_start, "duty_cycle must be between 0.0 and 1.0")
+        except ValueError:
+            return sirf(value_start, "duty_cycle must be a float")
+
+    def check_key_frequency(self, key: str, value: str, value_start: int) -> Optional[Result]:
+        try:
+            frequency_value = int(value.strip())
+            freq_min, freq_max = self.frequency_range
+            if frequency_value < freq_min or frequency_value > freq_max:
+                suggestion = f"{key}: {max(min(freq_max, frequency_value), freq_min)}"
+                return sirf(value_start, f"frequency outside of supported range ({freq_min} - {freq_max})",
+                            suggestion=suggestion)
+        except ValueError:
+            return sirf(value_start, "frequency must be an integer")
+
+    @staticmethod
+    def check_key_name(file_path: str, key: str, value: str, value_start: int) -> Optional[Result]:
+        name_check = value.strip()
+        if new_name := _config.name_check_config.get_name_rewrite(file_path, name_check.lower()):
+            if new_name != name_check:
+                suggestion = f"{key}: {new_name}"
+                return sirf(value_start, f"name should be '{new_name}'", suggestion=suggestion)
+
+    def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         split = line.split(":", 1)
         if len(split) != 2:
             return sirf(0, "cannot unpack key-value")
         key, value = split
-
         value_start = line.index(value.strip(), len(key))
 
         if key == "data":
-            marks = self.check_data(key, value)
-            if len(marks) > 0:
-                return mir(marks, "character not allowed here (non-Digit)")
+            return self.check_key_data(key, value)
 
         elif key in ("address", "command"):
-            marks = self.check_hex(key, value)
-            if len(marks) > 0:
-                return mir(marks, "character not allowed here (non-HEX)")
+            return self.check_value_hex(key, value)
 
         elif key == "protocol":
-            if value.strip() not in self.valid_protocols:
-                similar = get_close_matches(value, self.valid_protocols)
-                suggestion = None
-                if len(similar) > 0:
-                    suggestion = f"{key}: {similar[0]}"
-                return sirf(value_start, 
-                    f"Protocol '{value.strip()}' unknown", suggestion=suggestion)
-        
+            return self.check_key_protocol(key, value, value_start)
+
         elif key == "duty_cycle":
-            try:
-                float_value = float(value.strip())
-                if float_value < 0 or float_value > 1:
-                    return sirf(value_start, "duty_cycle must be between 0.0 and 1.0")
-            except ValueError:
-                return sirf(value_start, "duty_cycle must be a float")
-        
+            return self.check_key_duty_cycle(value, value_start)
+
+        elif key == "frequency":
+            return self.check_key_frequency(key, value, value_start)
+
+        elif key == "name":
+            return self.check_key_name(file_path, key, value, value_start)
+
         return None
+
 
 ###
 
-def check_file(file_path: str, file_descriptor: TextIOWrapper, on_found = None) -> bool:
+def check_file(file_path: str, file_descriptor: TextIO, on_found=None) -> bool:
     """ Checks a file for errors
     """
 
@@ -572,7 +641,7 @@ def check_file(file_path: str, file_descriptor: TextIOWrapper, on_found = None) 
     context = Context()
 
     for _lnr, line in enumerate([z.strip("\n") for z in file_descriptor.readlines()]):
-        lnr = _lnr + 1 # human readable line numbers
+        lnr = _lnr + 1  # human-readable line numbers
 
         # comments
         if line.startswith("#"):
@@ -586,7 +655,7 @@ def check_file(file_path: str, file_descriptor: TextIOWrapper, on_found = None) 
                 continue
 
             # execute check
-            resp: Result = check.check(context, lnr, line)
+            resp: Result = check.check(context, file_path, lnr, line)
 
             # if check passed, do nothing
             if resp is None:
@@ -619,9 +688,11 @@ def check_file(file_path: str, file_descriptor: TextIOWrapper, on_found = None) 
 
     return did_pass
 
+
 class ErrorCounter:
     """ ErrorCounter is used to count raised total/file/line errors
     """
+
     def __init__(self) -> None:
         self.total_count = 0
         self.file_count = 0

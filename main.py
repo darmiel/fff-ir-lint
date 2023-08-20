@@ -20,10 +20,12 @@ FORMATS = {
     "json": result_json_output,
 }
 
+
 def unused(*args):
     """ Dummy callback
     """
     _ = args
+
 
 def main():
     """ Main entrypoint
@@ -82,13 +84,14 @@ def main():
 
         with open(file, "r", encoding='UTF-8') as file_descriptor:
             check_file(file, file_descriptor, proxy_callback)
-        
+
         file_done_callback(file, error_counter)
 
     all_done_callback(error_counter)
 
     if error_counter.total_count != 0:
         sys.exit(f"\n[lint] found a total of {error_counter.total_count} warnings/errors")
+
 
 if __name__ == "__main__":
     main()

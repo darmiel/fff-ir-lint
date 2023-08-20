@@ -4,17 +4,19 @@
 from lint import create_error_indicator_str
 from lint import Result
 
+
 def result_github_output():
     """ Simple github callback
     """
-    headers = [] # used to check if the file already has a header
+    headers = []  # used to check if the file already has a header
+
     def result(file_path: str, lnr: int, line: str, result: Result):
-        if not file_path in headers:
+        if file_path not in headers:
             headers.append(file_path)
             print(f"## `🐛 {file_path}`")
         else:
-            print("\n---\n") # separator
-        
+            print("\n---\n")  # separator
+
         print("```diff")
 
         # print line number
@@ -26,6 +28,7 @@ def result_github_output():
         print("```")
         if result.suggestion is not None:
             print(f"> **Note**(**suggested**): `{result.suggestion}`")
+
     return {
         "result": result
     }
