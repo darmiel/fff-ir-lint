@@ -584,7 +584,7 @@ class DataValidityCheck(Check):
         if new_name := _config.name_check_config.get_name_rewrite(file_path, name_check.lower()):
             if new_name != name_check:
                 suggestion = f"{key}: {new_name}"
-                return sirf(value_start, f"name should be '{new_name}'", suggestion=suggestion)
+                return sirf(value_start, f"recommended name '{new_name}' (WIP)", suggestion=suggestion)
 
     def check(self, ctx: Context, file_path: str, lnr: int, line: str) -> Optional[Result]:
         split = line.split(":", 1)
