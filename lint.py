@@ -515,6 +515,7 @@ class DataValidityCheck(Check):
             "RCA"
         ]
         self.frequency_range = (10_000, 56_000)
+        self.names = []
 
     def ignore_if_failed(self) -> list:
         return [KeyValueValidityCheck]
@@ -578,10 +579,17 @@ class DataValidityCheck(Check):
         except ValueError:
             return sirf(value_start, "frequency must be an integer")
 
-    @staticmethod
-    def check_key_name(file_path: str, key: str, value: str, value_start: int) -> Optional[Result]:
+    def check_key_name(self, file_path: str, key: str, value: str, value_start: int) -> Optional[Result]:
         name_check = value.strip()
-        if new_name := _config.name_check_config.get_name_rewrite(file_path, name_check.lower()):
+        lower_name_check = name_check.lower()
+
+        # check for duplicate name
+        if lower_name_check != 'unknown' and lower_name_check in self.names:
+            return sirf(value_start, f"ambiguous name '{name_check}'")
+        self.names.append(lower_name_check)
+
+        # check for name rewrite
+        if new_name := _config.name_check_config.get_name_rewrite(file_path, lower_name_check):
             if new_name != name_check:
                 suggestion = f"{key}: {new_name}"
                 return sirf(value_start, f"recommended name '{new_name}' (WIP)", suggestion=suggestion)

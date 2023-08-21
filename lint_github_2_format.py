@@ -27,11 +27,9 @@ class GitHubFormatTwo:
         if results is None:
             return
 
-        print(f"## `🐛 {file_path}` [{len(results)} errors]")
-        for i, result in enumerate(results):
-            if i != 0:  # print separator
-                print("\n---\n")
+        print(f"## `{file_path}` [{len(results)} issues]\n")
 
+        for i, result in enumerate(results):
             # print diff with error
             print("```diff")
             print(f"# Line {result.lnr}:")
@@ -45,6 +43,7 @@ class GitHubFormatTwo:
                 print(f"> (**suggestion**): `{result.result.suggestion}`")
 
             print()
+        print("\n---\n")
 
 
 def result_github_2_output():
