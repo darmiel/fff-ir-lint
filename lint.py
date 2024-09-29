@@ -507,6 +507,7 @@ class DataValidityCheck(Check):
             "NECext",
             "NEC42",
             "NEC42ext",
+            "Pioneer",
             "SIRC",
             "SIRC15",
             "SIRC20",
